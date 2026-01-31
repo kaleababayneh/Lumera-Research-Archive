@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lumera Research Archive</title>
+  <meta name="description"
+    content="Collaborative research platform with encrypted drafts on Lumera's Cascade permanent storage" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+</head>
+
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <h1>📚 Lumera Research Archive</h1>
+      <p>Collaborative research platform with encrypted drafts on Cascade</p>
+    </header>
+
+    <!-- Wallet Connection -->
+    <section class="wallet-section">
+      <button id="wallet-button">Connect Wallet</button>
+      <span id="wallet-status" class="hidden"></span>
+    </section>
+
+    <!-- Status Message -->
+    <div id="status-message" class="status-message hidden"></div>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav disabled" id="tab-nav">
+      <button class="tab-button active" data-tab="drafts">📝 My Drafts</button>
+      <button class="tab-button" data-tab="invited">📨 Invited Drafts</button>
+      <button class="tab-button" data-tab="publish">🚀 Publish</button>
+      <button class="tab-button" data-tab="archive">📄 My Papers</button>
+      <button class="tab-button" data-tab="publications">🌐 Publications</button>
+    </nav>
+
+    <!-- ==================== DRAFTS TAB ==================== -->
+    <section id="tab-drafts" class="tab-content active">
+      <!-- Create New Draft -->
+      <div class="section">
+        <div class="section-header">
+          <h2>📝 Drafts</h2>
+          <button id="new-draft-button" class="btn-primary" disabled>+ New Draft</button>
+        </div>
+        <div id="drafts-container">
+          <p class="empty-state">No drafts yet. Create your first private draft!</p>
+        </div>
+      </div>
+
+      <!-- Draft Editor (hidden by default) -->
+      <div id="draft-editor-section" class="section hidden">
+        <div class="section-header">
+          <h2>✏️ <span id="draft-editor-title">Draft Editor</span></h2>
+          <div class="editor-actions">
+            <span id="draft-status-badge" class="status-badge draft">🔒 Private</span>
+            <button id="save-draft-button" class="btn-secondary">💾 Save</button>
+            <button id="publish-draft-button" class="btn-primary">🚀 Publish</button>
+            <button id="close-editor-button" class="btn-ghost">✕</button>
+          </div>
+        </div>
+
+        <form id="draft-form">
+          <div class="form-group">
+            <label for="draft-title">Title</label>
+            <input type="text" id="draft-title" placeholder="Paper title..." required />
+          </div>
+          <div class="form-group">
+            <label for="draft-content">Content</label>
+            <textarea id="draft-content"
+              placeholder="Write your paper here...&#10;&#10;Your content is encrypted and only visible to you and collaborators."
+              rows="15"></textarea>
+          </div>
+          <div id="draft-progress" class="progress-container hidden">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+            <p class="progress-text">Saving...</p>
+          </div>
+        </form>
+
+        <!-- Collaborators Panel -->
+        <div class="collaborators-panel">
+          <h4>👥 Collaborators</h4>
+          <div id="collaborators-list">
+            <p class="empty-state-small">Only you have access</p>
+          </div>
+          <div class="add-collaborator">
+            <input type="text" id="collaborator-wallet" placeholder="Wallet address (lumera1...)" />
+            <input type="text" id="collaborator-name" placeholder="Name" />
+            <button id="add-collaborator-button" class="btn-secondary">Invite</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== INVITED DRAFTS TAB ==================== -->
+    <section id="tab-invited" class="tab-content hidden">
+      <div class="section">
+        <div class="section-header">
+          <h2>📨 Invited Drafts</h2>
+        </div>
+        <p class="section-description">Drafts that others have invited you to collaborate on.</p>
+        <div id="invited-drafts-container">
+          <p class="empty-state">No invitations yet. When someone invites you to collaborate, their drafts will appear
+            here.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PUBLISH TAB ==================== -->
+    <section id="tab-publish" class="tab-content hidden">
+      <div class="section">
+        <h2>🚀 Publish to Archive</h2>
+        <p class="section-description">Publish a draft to make it permanently public, or submit a new paper directly.
+        </p>
+
+        <form id="upload-form" class="paper-form">
+          <div class="form-group">
+            <label for="paper-title">Paper Title *</label>
+            <input type="text" id="paper-title" placeholder="e.g., Advances in Decentralized Storage Systems"
+              required />
+          </div>
+
+          <div class="form-group">
+            <label for="paper-abstract">Abstract *</label>
+            <textarea id="paper-abstract" placeholder="Brief summary of your research..." required rows="4"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="paper-authors">Authors (comma-separated) *</label>
+            <input type="text" id="paper-authors" placeholder="e.g., Alice Smith, Bob Johnson" required />
+          </div>
+
+          <div class="form-group">
+            <label for="paper-keywords">Keywords (comma-separated)</label>
+            <input type="text" id="paper-keywords" placeholder="e.g., blockchain, storage" />
+          </div>
+
+          <div class="form-group">
+            <label for="paper-citations">Citations (Action IDs, comma-separated)</label>
+            <input type="text" id="paper-citations" placeholder="e.g., 12345, 12346" />
+            <small class="form-hint">Reference other papers using their Action IDs</small>
+          </div>
+
+          <div class="form-group">
+            <label for="paper-content">Paper Content *</label>
+            <textarea id="paper-content" placeholder="Enter your full paper content here..." required
+              rows="10"></textarea>
+          </div>
+
+          <button type="submit" id="upload-button" class="btn-primary full-width">
+            🚀 Publish to Archive
+          </button>
+          <div id="upload-progress" class="progress-container hidden">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+            <p class="progress-text">Publishing...</p>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ==================== ARCHIVE TAB ==================== -->
+    <section id="tab-archive" class="tab-content hidden">
+      <div class="section">
+        <h2>📖 Published Papers</h2>
+        <div id="papers-container">
+          <p class="empty-state">No papers published yet.</p>
+        </div>
+      </div>
+
+      <!-- Paper Viewer -->
+      <div id="paper-viewer-container" class="section hidden">
+        <h2>📄 Paper Details</h2>
+        <div id="paper-viewer" class="paper-viewer">
+          <div class="paper-header">
+            <h3 id="view-title"></h3>
+            <p id="view-authors" class="paper-authors"></p>
+            <p id="view-meta" class="paper-meta"></p>
+          </div>
+          <div class="paper-abstract">
+            <h4>Abstract</h4>
+            <p id="view-abstract"></p>
+          </div>
+          <div id="view-keywords-container" class="paper-keywords hidden">
+            <h4>Keywords</h4>
+            <div id="view-keywords"></div>
+          </div>
+          <div id="view-citations-container" class="paper-citations hidden">
+            <h4>Citations</h4>
+            <ul id="view-citations"></ul>
+          </div>
+          <div class="paper-content">
+            <h4>Full Content</h4>
+            <pre id="view-content" class="content-display"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PUBLICATIONS TAB ==================== -->
+    <section id="tab-publications" class="tab-content hidden">
+      <div class="section">
+        <h2>🌐 All Publications</h2>
+        <p class="section-description">Discover all research papers published on Lumera Cascade</p>
+        <div id="publications-container">
+          <p class="empty-state">Loading publications...</p>
+        </div>
+      </div>
+
+      <!-- Paper Viewer for Publications -->
+      <div id="publications-viewer-container" class="section hidden">
+        <h2>📄 Paper Details</h2>
+        <div id="publications-viewer" class="paper-viewer">
+          <div class="paper-header">
+            <h3 id="pub-view-title"></h3>
+            <p id="pub-view-authors" class="paper-authors"></p>
+            <p id="pub-view-meta" class="paper-meta"></p>
+          </div>
+          <div class="paper-abstract">
+            <h4>Abstract</h4>
+            <p id="pub-view-abstract"></p>
+          </div>
+          <div class="paper-keywords" id="pub-view-keywords-container">
+            <h4>Keywords</h4>
+            <div id="pub-view-keywords" class="keywords-list"></div>
+          </div>
+          <div class="paper-citations" id="pub-view-citations-container">
+            <h4>Citations</h4>
+            <ul id="pub-view-citations" class="citations-list"></ul>
+          </div>
+          <div class="paper-content">
+            <h4>Full Content</h4>
+            <pre id="pub-view-content" class="content-display"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Info Section -->
+    <section class="section info-section">
+      <h2>About Lumera Research Archive</h2>
+      <ul class="info-list">
+        <li><strong>🔒 Private Drafts:</strong> Encrypted content stored on Cascade, only you can read it</li>
+        <li><strong>👥 Collaboration:</strong> Share drafts with co-authors via wallet address</li>
+        <li><strong>🚀 Publish:</strong> When ready, publish permanently to the public archive</li>
+        <li><strong>🔗 Citations:</strong> Reference other papers using lumera:// URIs</li>
+        <li><strong>✍️ Verification:</strong> All submissions cryptographically signed by wallet</li>
+      </ul>
+    </section>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>
