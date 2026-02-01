@@ -3,7 +3,7 @@
  * Fetches actions and metadata from Lumescope indexer
  */
 
-import { LUMESCOPE_API_BASE } from './config';
+import { LUMESCOPE_API_BASE, LIMIT } from './config';
 
 /**
  * Lumescope action response
@@ -63,7 +63,7 @@ export async function getActionsByCreator(
 ): Promise<LumescopeAction[]> {
     const params = new URLSearchParams({
         creator: creatorAddress,
-        limit: limit.toString(),
+        limit: LIMIT.toString(),
     });
 
     // Note: Lumescope doesn't support filtering by type in the query
@@ -109,7 +109,7 @@ export async function getActionsByCreator(
  */
 export async function getAllActions(limit = 100): Promise<LumescopeAction[]> {
     const params = new URLSearchParams({
-        limit: limit.toString(),
+        limit: LIMIT.toString(),
     });
 
     const url = `${LUMESCOPE_API_BASE}/v1/actions?${params}`;

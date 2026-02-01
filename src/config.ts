@@ -9,6 +9,8 @@ export const CHAIN_NAME = 'Lumera Testnet';
 export const RPC_ENDPOINT = 'https://rpc.testnet.lumera.io';
 export const LCD_ENDPOINT = 'https://lcd.testnet.lumera.io';
 
+export const LIMIT = 10000;
+
 // Token configuration
 export const DENOM = 'ulume';
 export const DISPLAY_DENOM = 'LUME';

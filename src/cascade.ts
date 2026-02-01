@@ -20,6 +20,7 @@ import {
     extractContent,
 } from './paper';
 import { getActionsByCreator } from './lumescope';
+import { LIMIT } from './config';
 
 // Lumera client instance
 let lumeraClient: LumeraClient | null = null;
@@ -357,7 +358,8 @@ export function savePaperToFallback(paper: StoredPaper): void {
 export async function fetchAllPublications(): Promise<StoredPaper[]> {
     try {
         // Query Lumescope for all Cascade actions (no creator filter)
-        const url = `${LUMESCOPE_API_BASE}/v1/actions?limit=100`;
+
+        const url = `${LUMESCOPE_API_BASE}/v1/actions?limit=${LIMIT.toString()}`;
         console.log('🔍 Querying all publications:', url);
 
         const response = await fetch(url);
