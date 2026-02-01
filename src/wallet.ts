@@ -4,7 +4,7 @@
  */
 
 import { CHAIN_ID, LUMERA_CHAIN_INFO } from './config';
-
+console.log('LUMERA_CHAIN_INFO', LUMERA_CHAIN_INFO);
 // Session storage key
 const WALLET_SESSION_KEY = 'lumera_connected_wallet';
 

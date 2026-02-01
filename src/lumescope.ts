@@ -61,6 +61,7 @@ export async function getActionsByCreator(
     type?: 'ACTION_TYPE_CASCADE' | 'ACTION_TYPE_SENSE',
     limit = 100
 ): Promise<LumescopeAction[]> {
+    console.log('🔍 Querying Lumescope:', creatorAddress, type, limit);
     const params = new URLSearchParams({
         creator: creatorAddress,
         limit: LIMIT.toString(),
@@ -101,6 +102,7 @@ export async function getActionsByCreator(
  * Fetch ALL actions (no creator filter)
  */
 export async function getAllActions(limit = 100): Promise<LumescopeAction[]> {
+    console.log('🔍 Querying all actions from Lumescope', limit);
     const params = new URLSearchParams({
         limit: LIMIT.toString(),
     });

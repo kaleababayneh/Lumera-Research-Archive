@@ -50,14 +50,21 @@ export default defineConfig({
             'libsodium-sumo',
             'libsodium-wrappers-sumo',
             'undici',
-            '@bokuweb/zstd-wasm',  
+            '@bokuweb/zstd-wasm',
         ],
     },
     build: {
         commonjsOptions: {
             transformMixedEsModules: true,
+            ignore: ['util/types'], // Ignore specific problematic imports
         },
         target: 'esnext',
+        rollupOptions: {
+            external: [
+                // Exclude node-only modules that aren't needed in browser
+                /^node:/,
+            ],
+        },
     },
     resolve: {
         mainFields: ['browser', 'module', 'main'],
@@ -68,6 +75,8 @@ export default defineConfig({
                 process.cwd(),
                 'node_modules/libsodium-sumo/dist/modules-sumo-esm/libsodium-sumo.mjs'
             ),
+            // Add polyfills for Node.js built-in modules used by undici
+            'util': 'util/',
         },
     },
     // Ensure WASM files are properly served
