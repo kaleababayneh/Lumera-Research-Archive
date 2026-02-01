@@ -717,12 +717,12 @@ async function getDocumentKey(draft: Draft): Promise<Uint8Array> {
     const collaborator = draft.collaborators.find((c) => c.wallet === wallet);
     if (collaborator) {
         console.log('🔑 Found collaborator key share for wallet:', wallet);
-        
+
         // Check if the key share is valid (not empty)
         if (!collaborator.keyShare.encryptedKey || !collaborator.keyShare.nonce) {
             throw new Error('NO_KEY_SHARE: You need to use the invitation link to access this draft. Please ask the draft owner to send you the secure link.');
         }
-        
+
         return decryptKeyShare(collaborator.keyShare, derivedKey);
     }
 
@@ -785,18 +785,135 @@ export function getStoredDrafts(): StoredDraft[] {
 /**
  * Fetch collaboration invitations for the current user
  * 
- * NOTE: We no longer auto-download invitations because:
- * 1. The invitation file doesn't contain a usable key (key comes from share link URL)
- * 2. Downloading triggers unnecessary SDK signatures
- * 3. The draft is only useful AFTER user clicks the share link anyway
+ * NEW APPROACH: Discover invitations by querying Lumescope and downloading metadata
+ * - Query Lumescope for invitation files (invitation_WALLET_DRAFTID.json)
+ * - Download invitation files to get the real draft title
+ * - Create placeholder drafts in localStorage with empty key shares
+ * - Users see pending invitations in the "Invited Drafts" tab with proper titles
+ * - Full access is granted when user clicks the share link
  * 
- * Invitations are now discovered when user clicks the share link.
- * This function is kept for backwards compatibility but does nothing.
+ * Note: Invitation files are public, so downloading doesn't require signatures
  */
 async function fetchCollaborationInvitations(walletAddress: string): Promise<void> {
-    // Intentionally empty - invitations are processed when user clicks share link
-    // This avoids unnecessary SDK downloads and signature prompts
-    console.log(`📬 Invitation discovery is now link-based (no auto-download)`);
+    try {
+        const { getAllActions } = await import('./lumescope');
+        const actions = await getAllActions(200);
+
+        // Find invitation files for this wallet
+        const invitations = actions.filter((action) => {
+            const fileName = action.decoded?.file_name || '';
+            return (
+                action.type === 'ACTION_TYPE_CASCADE' &&
+                action.state === 'ACTION_STATE_DONE' &&
+                fileName.startsWith(`invitation_${walletAddress}_`) &&
+                fileName.endsWith('.json')
+            );
+        });
+
+        console.log(`📬 Discovered ${invitations.length} invitations for ${walletAddress}`);
+
+        const lumeraClient = getLumeraClient();
+        if (!lumeraClient) {
+            console.warn('Cascade client not initialized, cannot fetch invitation details');
+            return;
+        }
+
+        // Process each invitation
+        for (const invitationAction of invitations) {
+            const fileName = invitationAction.decoded?.file_name || '';
+
+            // Extract draft ID from filename: invitation_WALLET_DRAFTID.json
+            const match = fileName.match(/invitation_[^_]+_([^\.]+)\.json/);
+            if (!match) continue;
+
+            const draftId = match[1];
+
+            // Check if we already have this draft
+            const existingDraft = getDraft(draftId);
+            if (existingDraft) {
+                // Check if current user is already in the collaborators list
+                const isAlreadyCollaborator = existingDraft.collaborators.some(
+                    c => c.wallet === walletAddress
+                );
+                if (isAlreadyCollaborator) {
+                    console.log(`Already a collaborator on draft ${draftId}`);
+                    continue;
+                }
+            }
+
+            try {
+                // Download the invitation file to get the draft title
+                const downloadStream = await lumeraClient.Cascade.downloader.download(invitationAction.id);
+                const reader = downloadStream.getReader();
+                const chunks: Uint8Array[] = [];
+                let done = false;
+                while (!done) {
+                    const result = await reader.read();
+                    done = result.done;
+                    if (result.value) chunks.push(result.value);
+                }
+
+                const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+                const downloadedBytes = new Uint8Array(totalLength);
+                let offset = 0;
+                for (const chunk of chunks) {
+                    downloadedBytes.set(chunk, offset);
+                    offset += chunk.length;
+                }
+
+                const invitationJson = new TextDecoder().decode(downloadedBytes);
+                const invitation: CollaborationInvitation = JSON.parse(invitationJson);
+
+                // Create draft with real title from invitation
+                const draft: Draft = existingDraft || {
+                    draftId,
+                    title: invitation.draftTitle,
+                    owner: invitation.owner,
+                    collaborators: [],
+                    status: 'shared',
+                    versions: [{
+                        version: invitation.latestVersion,
+                        actionId: invitation.latestActionId,
+                        createdAt: invitation.createdAt,
+                        createdBy: invitation.owner,
+                        message: 'Pending invitation',
+                    }],
+                    ownerEncryptedKey: '',
+                    ownerKeyNonce: '',
+                    createdAt: invitation.createdAt,
+                    updatedAt: Date.now(),
+                };
+
+                // Add current user as collaborator with empty key share
+                const collaborator: Collaborator = {
+                    wallet: walletAddress,
+                    name: walletAddress,
+                    keyShare: {
+                        wallet: walletAddress,
+                        encryptedKey: '',
+                        nonce: '',
+                    },
+                    addedAt: invitation.createdAt,
+                    addedBy: invitation.invitedBy,
+                };
+
+                if (!existingDraft) {
+                    draft.collaborators.push(collaborator);
+                    saveDraft(draft);
+                    console.log(`📬 Added invitation: ${invitation.draftTitle}`);
+                } else {
+                    existingDraft.collaborators.push(collaborator);
+                    saveDraft(existingDraft);
+                    console.log(`📬 Added user to draft: ${invitation.draftTitle}`);
+                }
+            } catch (downloadError) {
+                console.warn(`Failed to download invitation ${draftId}:`, downloadError);
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to discover invitations:', error);
+        // Non-critical - user can still access via share link
+    }
 }
 
 /**
@@ -955,15 +1072,15 @@ export async function fetchUserDrafts(walletAddress: string): Promise<StoredDraf
         // This is necessary because collaborators' saves are under THEIR wallet, not the owner's
         const { getAllActions } = await import('./lumescope');
         const allActions = await getAllActions(200);
-        
+
         // For each draft the owner created, check for additional versions from collaborators
         for (const [draftId, _versions] of draftMap.entries()) {
             const collaboratorVersions = allActions.filter((action) => {
                 const fileName = action.decoded?.file_name || '';
                 const match = fileName.match(/draft_([^_]+)_v(\d+)\.json/);
                 return (
-                    match && 
-                    match[1] === draftId && 
+                    match &&
+                    match[1] === draftId &&
                     action.state === 'ACTION_STATE_DONE' &&
                     action.creator !== walletAddress // Only collaborator versions
                 );
@@ -976,7 +1093,7 @@ export async function fetchUserDrafts(walletAddress: string): Promise<StoredDraf
 
                 const version = parseInt(match[2], 10);
                 const existsInMap = draftMap.get(draftId)!.some(v => v.version === version);
-                
+
                 if (!existsInMap) {
                     console.log(`📥 Found collaborator version for draft ${draftId}: v${version} by ${action.creator}`);
                     draftMap.get(draftId)!.push({
@@ -1004,11 +1121,11 @@ export async function fetchUserDrafts(walletAddress: string): Promise<StoredDraf
             // Sync versions from Cascade to local draft
             if (localDraft) {
                 const localLatestVersion = localDraft.versions[localDraft.versions.length - 1]?.version || 0;
-                
+
                 // If Cascade has newer versions, update local draft
                 if (latestVersion.version > localLatestVersion) {
                     console.log(`📥 Syncing new versions for draft ${draftId}: local v${localLatestVersion} -> cascade v${latestVersion.version}`);
-                    
+
                     // Add missing versions to local draft
                     for (const v of versions) {
                         const exists = localDraft.versions.some(lv => lv.version === v.version);
@@ -1022,7 +1139,7 @@ export async function fetchUserDrafts(walletAddress: string): Promise<StoredDraf
                             });
                         }
                     }
-                    
+
                     // Sort versions
                     localDraft.versions.sort((a, b) => a.version - b.version);
                     localDraft.updatedAt = Date.now();
