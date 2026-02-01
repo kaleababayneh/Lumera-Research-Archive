@@ -10,6 +10,7 @@ import {
     isWalletConnected,
     isKeplrInstalled,
     formatAddress,
+    initializeWalletState,
 } from './wallet';
 import {
     initializeCascadeClient,
@@ -83,6 +84,25 @@ export function initUI(): void {
         });
     }
 
+    // Restore wallet state from session storage
+    initializeWalletState();
+
+    // If wallet was connected, initialize Cascade client and drafts
+    if (isWalletConnected()) {
+        initializeCascadeClient()
+            .then(() => initDrafts())
+            .then(() => {
+                updateUI();
+                showStatus('Wallet reconnected from previous session!', 'success');
+            })
+            .catch((error) => {
+                console.error('Failed to initialize after session restore:', error);
+                // Clear the session if initialization fails
+                disconnectWallet();
+                updateUI();
+            });
+    }
+
     updateUI();
 }
 
@@ -133,10 +153,10 @@ async function handleWalletClick(): Promise<void> {
             await initializeCascadeClient();
             await initDrafts();
             updateUI();
-            
+
             // Check for pending share link
             await processPendingShareLink();
-            
+
             showStatus('Wallet connected! Ready to create encrypted drafts.', 'success');
         } catch (error) {
             console.error('Connection error:', error);
@@ -170,7 +190,7 @@ async function processPendingShareLink(): Promise<void> {
             showStatus(`✅ ${result.message}`, 'success');
             renderDraftsList();
             renderInvitedDraftsList();
-            
+
             // Switch to invited drafts tab
             switchTab('invited');
         } else {
@@ -240,7 +260,7 @@ async function openDraftEditor(draftId: string): Promise<void> {
     editorSection.classList.remove('hidden');
     titleInput.value = draft.title;
     editorTitle.textContent = draft.title;
-    
+
     // Reset editor state
     contentInput.disabled = false;
     contentInput.placeholder = 'Write your paper here...\n\nYour content is encrypted and only visible to you and collaborators.';
@@ -283,13 +303,13 @@ async function openDraftEditor(draftId: string): Promise<void> {
         } catch (error) {
             console.error('Load content error:', error);
             const errorMessage = error instanceof Error ? error.message : 'Failed to decrypt draft content';
-            
+
             // Check if this is a missing key error
             if (errorMessage.includes('NO_KEY_SHARE')) {
                 contentInput.value = '';
                 contentInput.placeholder = '🔐 You need the invitation link to access this draft content.\n\nPlease ask the draft owner to send you the secure invitation link.';
                 showStatus('⚠️ Missing encryption key. You need to use the invitation link to access this draft.', 'error');
-                
+
                 // Disable editing until key is imported
                 contentInput.disabled = true;
                 const saveBtn = document.getElementById('save-draft-button') as HTMLButtonElement;
@@ -424,11 +444,11 @@ function renderCollaborators(draft: Draft): void {
                 e.preventDefault();
                 const index = parseInt((btn as HTMLElement).dataset.index || '0', 10);
                 const collaborator = draft.collaborators[index];
-                
+
                 if (collaborator?.documentKeyBase64) {
                     const { generateShareLink } = await import('./drafts');
                     const shareLink = generateShareLink(draft.draftId, collaborator.documentKeyBase64);
-                    
+
                     try {
                         await navigator.clipboard.writeText(shareLink);
                         btn.textContent = '✅';
@@ -536,10 +556,10 @@ async function renderInvitedDraftsList(): Promise<void> {
                 const date = new Date(d.updatedAt).toLocaleDateString();
                 const ownerDisplay = d.owner ? formatAddress(d.owner) : 'Unknown';
                 const hasKey = hasValidKeyForDraft(d.draftId);
-                const keyStatus = hasKey 
+                const keyStatus = hasKey
                     ? '<span style="color: #4caf50;">🔓 Access granted</span>'
                     : '<span style="color: #ff9800;">🔐 Needs invitation link</span>';
-                
+
                 return `
                 <div class="draft-card invited ${!hasKey ? 'needs-key' : ''}" data-draft-id="${d.draftId}">
                     <div class="draft-info">
@@ -610,7 +630,7 @@ async function handlePublishDraft(): Promise<void> {
 
     const titleInput = document.getElementById('draft-title') as HTMLInputElement;
     const contentInput = document.getElementById('draft-content') as HTMLTextAreaElement;
-    
+
     const title = titleInput.value.trim();
     const content = contentInput.value.trim();
 
@@ -662,12 +682,12 @@ async function handlePublishDraft(): Promise<void> {
 
         showStatus(`Paper published! URI: ${formatPaperUri(actionId)}`, 'success');
         closeEditor();
-        
+
         // Refresh all lists
         renderPapersList();
         renderDraftsList();
         renderInvitedDraftsList();
-        
+
         // Switch to archive tab to show the published paper
         switchTab('archive');
     } catch (error) {

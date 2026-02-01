@@ -5,9 +5,25 @@
 
 import { CHAIN_ID, LUMERA_CHAIN_INFO } from './config';
 
+// Session storage key
+const WALLET_SESSION_KEY = 'lumera_connected_wallet';
+
 // Wallet state
 let connectedAddress: string | null = null;
 let isConnected = false;
+
+/**
+ * Initialize wallet state from session storage
+ * Call this on app startup to restore previous connection
+ */
+export function initializeWalletState(): void {
+    const savedAddress = sessionStorage.getItem(WALLET_SESSION_KEY);
+    if (savedAddress) {
+        connectedAddress = savedAddress;
+        isConnected = true;
+        console.log('🔄 Restored wallet connection from session:', savedAddress);
+    }
+}
 
 /**
  * Check if Keplr wallet extension is installed
@@ -46,6 +62,9 @@ export async function connectWallet(): Promise<string> {
         connectedAddress = key.bech32Address;
         isConnected = true;
 
+        // Save to session storage
+        sessionStorage.setItem(WALLET_SESSION_KEY, connectedAddress);
+
         console.log('Wallet connected:', connectedAddress);
         return connectedAddress;
     } catch (error) {
@@ -64,6 +83,10 @@ export async function connectWallet(): Promise<string> {
 export function disconnectWallet(): void {
     connectedAddress = null;
     isConnected = false;
+
+    // Clear from session storage
+    sessionStorage.removeItem(WALLET_SESSION_KEY);
+
     console.log('Wallet disconnected');
 }
 
