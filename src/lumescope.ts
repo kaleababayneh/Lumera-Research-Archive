@@ -58,16 +58,14 @@ interface LumescopeResponse {
  */
 export async function getActionsByCreator(
     creatorAddress: string,
-    type?: 'cascade' | 'sense',
+    type?: 'ACTION_TYPE_CASCADE' | 'ACTION_TYPE_SENSE',
     limit = 100
 ): Promise<LumescopeAction[]> {
     const params = new URLSearchParams({
         creator: creatorAddress,
         limit: LIMIT.toString(),
+        type: 'ACTION_TYPE_CASCADE',
     });
-
-    // Note: Lumescope doesn't support filtering by type in the query
-    // We'll filter client-side instead
 
     const url = `${LUMESCOPE_API_BASE}/v1/actions?${params}`;
 
@@ -87,11 +85,6 @@ export async function getActionsByCreator(
 
         // Filter by type client-side if specified
         let items = data.items || [];
-        if (type) {
-            const typeFilter = type === 'cascade' ? 'ACTION_TYPE_CASCADE' : 'ACTION_TYPE_SENSE';
-            items = items.filter(item => item.type === typeFilter);
-            console.log(`📦 After filtering for ${typeFilter}:`, items.length);
-        }
 
         return items;
     } catch (error) {

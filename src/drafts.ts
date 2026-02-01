@@ -165,7 +165,7 @@ export async function createDraft(
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
     onProgress?.(30);
 
-    const expirationTime = Math.floor(Date.now() / 1000) + 90000;
+    const expirationTime = Math.floor(Date.now() / 1000) + 90000 * 30;
     const uploadResult = await lumeraClient.Cascade.uploader.uploadFile(manifestBytes, {
         fileName: `draft_${draftId}_v1.json`,
         isPublic: true,
@@ -264,7 +264,7 @@ export async function saveDraftVersion(
     const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest));
     onProgress?.(40);
 
-    const expirationTime = Math.floor(Date.now() / 1000) + 90000;
+    const expirationTime = Math.floor(Date.now() / 1000) + 90000 * 30;
     const uploadResult = await lumeraClient.Cascade.uploader.uploadFile(manifestBytes, {
         fileName: `draft_${draftId}_v${newVersionNum}.json`,
         isPublic: true,
@@ -679,7 +679,7 @@ async function uploadCollaborationInvitation(
     const invitationBytes = new TextEncoder().encode(invitationJson);
     const fileName = `invitation_${collaborator.wallet}_${draft.draftId}.json`;
 
-    const expirationTime = Math.floor(Date.now() / 1000) + 90000;
+    const expirationTime = Math.floor(Date.now() / 1000) + 90000 * 30;
     const uploadResult = await lumeraClient.Cascade.uploader.uploadFile(invitationBytes, {
         fileName,
         isPublic: true,
@@ -915,7 +915,7 @@ export async function fetchUserDrafts(walletAddress: string): Promise<StoredDraf
 
     try {
         // Get drafts created by this wallet
-        const actions = await getActionsByCreator(walletAddress, 'cascade');
+        const actions = await getActionsByCreator(walletAddress, 'ACTION_TYPE_CASCADE');
 
         // Filter for encrypted drafts (by filename pattern)
         const draftActions = actions.filter((action) => {

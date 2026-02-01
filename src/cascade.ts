@@ -143,8 +143,8 @@ export async function uploadPaper(
         onProgress?.(10);
 
         // Calculate expiration time (25 hours from now)
-        // Blockchain requires minimum 24 hours (86400 seconds)
-        const expirationTime = Math.floor(Date.now() / 1000) + 90000;
+        // 90000 seconds = 25 hours
+        const expirationTime = Math.floor(Date.now() / 1000) + 90000 * 30;
 
         console.log('📦 Upload details:', {
             manifestSize: manifestBytes.length,
@@ -285,7 +285,7 @@ export async function downloadPaper(
  */
 export async function fetchUserPapers(walletAddress: string): Promise<StoredPaper[]> {
     try {
-        const actions = await getActionsByCreator(walletAddress, 'cascade');
+        const actions = await getActionsByCreator(walletAddress, 'ACTION_TYPE_CASCADE');
         console.log('📄 Total Cascade actions found:', actions.length);
 
         // Filter for research papers
