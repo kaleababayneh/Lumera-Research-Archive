@@ -20,8 +20,7 @@ export const DECIMALS = 6;
 export const GAS_PRICE = '0.025ulume';
 
 // Lumescope API endpoint (local instance)
-export const LUMESCOPE_API_BASE = 'http://localhost:18080';
-
+export const LUMESCOPE_API_BASE = 'http://lumescope-docker-6psf9p-a6f531-20-200-120-66.traefik.me';
 /**
  * Keplr chain info for Lumera Testnet
  * This is used to suggest the chain to the Keplr wallet
