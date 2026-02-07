@@ -20,8 +20,8 @@ export const DECIMALS = 6;
 export const GAS_PRICE = '0.025ulume';
 
 // Lumescope API endpoint
-export const LUMESCOPE_API_BASE =
-    import.meta.env.VITE_LUMESCOPE_API_BASE;
+// Using HTTPS for the publicly accessible Lumescope instance
+export const LUMESCOPE_API_BASE = import.meta.env.VITE_LUMESCOPE_API_BASE
 /**
  * Keplr chain info for Lumera Testnet
  * This is used to suggest the chain to the Keplr wallet
