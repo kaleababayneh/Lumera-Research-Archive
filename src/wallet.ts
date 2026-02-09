@@ -50,8 +50,8 @@ export async function connectWallet(): Promise<string> {
     try {
         // // Suggest the Lumera testnet chain to Keplr
         // // Using type assertion for experimentalSuggestChain which may not be in all type definitions
-        // await (keplr as unknown as { experimentalSuggestChain: (info: typeof LUMERA_CHAIN_INFO) => Promise<void> })
-        //     .experimentalSuggestChain(LUMERA_CHAIN_INFO);
+        await (keplr as unknown as { experimentalSuggestChain: (info: typeof LUMERA_CHAIN_INFO) => Promise<void> })
+             .experimentalSuggestChain(LUMERA_CHAIN_INFO);
 
         // Enable the chain (prompts user for permission)
         await keplr.enable(CHAIN_ID);
