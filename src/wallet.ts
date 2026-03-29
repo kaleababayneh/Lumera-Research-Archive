@@ -1,16 +1,23 @@
 /**
  * Wallet Module
- * Handles Leap wallet connection and state management
+ * Handles wallet connection and state management
+ * Supports Keplr and Leap wallets
  */
 
 import { CHAIN_ID, LUMERA_CHAIN_INFO } from './config';
 console.log('LUMERA_CHAIN_INFO', LUMERA_CHAIN_INFO);
-// Session storage key
+
+// Supported wallet types
+export type WalletType = 'keplr' | 'leap';
+
+// Session storage keys
 const WALLET_SESSION_KEY = 'lumera_connected_wallet';
+const WALLET_TYPE_SESSION_KEY = 'lumera_wallet_type';
 
 // Wallet state
 let connectedAddress: string | null = null;
 let isConnected = false;
+let activeWalletType: WalletType | null = null;
 
 /**
  * Initialize wallet state from session storage
@@ -18,11 +25,20 @@ let isConnected = false;
  */
 export function initializeWalletState(): void {
     const savedAddress = sessionStorage.getItem(WALLET_SESSION_KEY);
-    if (savedAddress) {
+    const savedType = sessionStorage.getItem(WALLET_TYPE_SESSION_KEY) as WalletType | null;
+    if (savedAddress && savedType) {
         connectedAddress = savedAddress;
+        activeWalletType = savedType;
         isConnected = true;
-        console.log('🔄 Restored wallet connection from session:', savedAddress);
+        console.log(`🔄 Restored ${savedType} wallet connection from session:`, savedAddress);
     }
+}
+
+/**
+ * Check if Keplr wallet extension is installed
+ */
+export function isKeplrInstalled(): boolean {
+    return typeof window.keplr !== 'undefined';
 }
 
 /**
@@ -33,50 +49,77 @@ export function isLeapInstalled(): boolean {
 }
 
 /**
- * @deprecated Use isLeapInstalled instead
+ * Get list of available (installed) wallets
  */
-export const isKeplrInstalled = isLeapInstalled;
+export function getAvailableWallets(): WalletType[] {
+    const wallets: WalletType[] = [];
+    if (isKeplrInstalled()) wallets.push('keplr');
+    if (isLeapInstalled()) wallets.push('leap');
+    return wallets;
+}
 
 /**
- * Connect to Leap wallet
- * Suggests the Lumera chain if not already added and enables it
- * @returns The connected wallet address
- * @throws Error if Leap is not installed or user rejects connection
+ * Get the currently active wallet type
  */
-export async function connectWallet(): Promise<string> {
-    if (!isLeapInstalled()) {
+export function getActiveWalletType(): WalletType | null {
+    return activeWalletType;
+}
+
+/**
+ * Get the wallet provider from the window object
+ */
+function getWalletProvider(type: WalletType) {
+    if (type === 'keplr') return window.keplr;
+    if (type === 'leap') return window.leap;
+    return undefined;
+}
+
+/**
+ * Connect to a wallet
+ * Suggests the Lumera chain if not already added and enables it
+ * @param type - Which wallet to connect ('keplr' or 'leap')
+ * @returns The connected wallet address
+ * @throws Error if wallet is not installed or user rejects connection
+ */
+export async function connectWallet(type: WalletType): Promise<string> {
+    const provider = getWalletProvider(type);
+    const walletName = type === 'keplr' ? 'Keplr' : 'Leap';
+
+    if (!provider) {
+        const installUrl = type === 'keplr'
+            ? 'https://www.keplr.app/'
+            : 'https://www.leapwallet.io/';
         throw new Error(
-            'Leap wallet is not installed. Please install Leap extension from https://www.leapwallet.io/'
+            `${walletName} wallet is not installed. Please install it from ${installUrl}`
         );
     }
 
-    const leap = window.leap!;
-
     try {
-        // Suggest the Lumera testnet chain to Leap
-        await (leap as unknown as { experimentalSuggestChain: (info: typeof LUMERA_CHAIN_INFO) => Promise<void> })
-             .experimentalSuggestChain(LUMERA_CHAIN_INFO);
+        // Suggest the Lumera testnet chain
+        await (provider as any).experimentalSuggestChain(LUMERA_CHAIN_INFO);
 
         // Enable the chain (prompts user for permission)
-        await leap.enable(CHAIN_ID);
+        await provider.enable(CHAIN_ID);
 
         // Get the user's account using getKey
-        const key = await (leap as unknown as { getKey: (chainId: string) => Promise<{ bech32Address: string }> })
-            .getKey(CHAIN_ID);
-        connectedAddress = key.bech32Address;
+        const key = await (provider as any).getKey(CHAIN_ID);
+        const address: string = key.bech32Address;
+        connectedAddress = address;
         isConnected = true;
+        activeWalletType = type;
 
         // Save to session storage
-        sessionStorage.setItem(WALLET_SESSION_KEY, connectedAddress);
+        sessionStorage.setItem(WALLET_SESSION_KEY, address);
+        sessionStorage.setItem(WALLET_TYPE_SESSION_KEY, type);
 
-        console.log('Wallet connected:', connectedAddress);
-        return connectedAddress;
+        console.log(`Wallet connected via ${walletName}:`, address);
+        return address;
     } catch (error) {
-        console.error('Failed to connect wallet:', error);
+        console.error(`Failed to connect ${walletName} wallet:`, error);
         throw new Error(
             error instanceof Error
                 ? error.message
-                : 'Failed to connect to Leap wallet'
+                : `Failed to connect to ${walletName} wallet`
         );
     }
 }
@@ -87,9 +130,11 @@ export async function connectWallet(): Promise<string> {
 export function disconnectWallet(): void {
     connectedAddress = null;
     isConnected = false;
+    activeWalletType = null;
 
     // Clear from session storage
     sessionStorage.removeItem(WALLET_SESSION_KEY);
+    sessionStorage.removeItem(WALLET_TYPE_SESSION_KEY);
 
     console.log('Wallet disconnected');
 }
@@ -121,24 +166,21 @@ export function formatAddress(address: string): string {
  * Used for deriving encryption keys deterministically
  */
 export async function signMessage(message: string): Promise<Uint8Array> {
-    if (!isLeapInstalled()) {
-        throw new Error('Leap not installed');
+    if (!activeWalletType) {
+        throw new Error('No wallet connected');
+    }
+
+    const provider = getWalletProvider(activeWalletType);
+    if (!provider) {
+        throw new Error(`${activeWalletType} wallet not available`);
     }
 
     if (!connectedAddress) {
         throw new Error('Wallet not connected');
     }
 
-    const leap = window.leap!;
-
     // Use signArbitrary for ADR-036 signing
-    const signResult = await (leap as unknown as {
-        signArbitrary: (
-            chainId: string,
-            signer: string,
-            data: string
-        ) => Promise<{ signature: string }>;
-    }).signArbitrary(CHAIN_ID, connectedAddress, message);
+    const signResult = await (provider as any).signArbitrary(CHAIN_ID, connectedAddress, message);
 
     // Decode base64 signature to bytes
     const binaryString = atob(signResult.signature);

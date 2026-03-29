@@ -8,7 +8,7 @@ import {
     createLumeraClient,
     type LumeraClient,
 } from '@lumera-protocol/sdk-js';
-import { getConnectedAddress, isWalletConnected } from './wallet';
+import { getConnectedAddress, isWalletConnected, getActiveWalletType } from './wallet';
 import { GAS_PRICE, CHAIN_ID, LUMESCOPE_API_BASE } from './config';
 import {
     type ResearchPaper,
@@ -28,17 +28,21 @@ let lumeraClient: LumeraClient | null = null;
 const PAPERS_STORAGE_KEY = 'lumera_research_archive_papers_fallback';
 
 /**
- * Get a signer from Leap wallet for the specified chain.
- * Mirrors the SDK's getLeapSigner but avoids deep import restrictions.
+ * Get a signer from the active wallet (Keplr or Leap) for the specified chain.
  */
-async function getLeapSigner(chainId: string) {
-    if (typeof window === 'undefined' || !window.leap) {
-        throw new Error('Leap extension not found. Please install Leap from https://www.leapwallet.io/');
+async function getWalletSigner(chainId: string) {
+    const walletType = getActiveWalletType();
+    if (!walletType) {
+        throw new Error('No wallet connected');
     }
 
-    const leap = window.leap;
-    await leap.enable(chainId);
-    const offlineSigner = await leap.getOfflineSignerAuto(chainId);
+    const provider = walletType === 'keplr' ? window.keplr : window.leap;
+    if (!provider) {
+        throw new Error(`${walletType} wallet extension not found`);
+    }
+
+    await provider.enable(chainId);
+    const offlineSigner = await (provider as any).getOfflineSignerAuto(chainId);
 
     return {
         ...offlineSigner,
@@ -46,7 +50,7 @@ async function getLeapSigner(chainId: string) {
         signAmino: offlineSigner.signAmino?.bind(offlineSigner),
         signDirect: offlineSigner.signDirect?.bind(offlineSigner),
         async signArbitrary(_chainId: string, signerAddress: string, data: string | Uint8Array) {
-            const result = await leap.signArbitrary(_chainId, signerAddress, data);
+            const result = await (provider as any).signArbitrary(_chainId, signerAddress, data);
             return {
                 signed: data,
                 signature: result.signature,
@@ -72,9 +76,8 @@ export async function initializeCascadeClient(): Promise<void> {
     }
 
     try {
-        // Use the SDK's getLeapSigner which returns a UniversalSigner
-        // that properly supports signArbitrary for ADR-036 signing
-        const signer = await getLeapSigner(CHAIN_ID);
+        // Get signer from the active wallet (Keplr or Leap)
+        const signer = await getWalletSigner(CHAIN_ID);
 
         // Create the Lumera client using the testnet preset
         lumeraClient = await createLumeraClient({

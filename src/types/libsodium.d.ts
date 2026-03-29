@@ -1,4 +1,4 @@
-interface LeapWallet {
+interface CosmosWalletProvider {
     enable(chainId: string): Promise<void>;
     experimentalSuggestChain(chainInfo: any): Promise<void>;
     getKey(chainId: string): Promise<{ bech32Address: string }>;
@@ -11,7 +11,8 @@ interface LeapWallet {
 }
 
 interface Window {
-    leap?: LeapWallet;
+    keplr?: CosmosWalletProvider;
+    leap?: CosmosWalletProvider;
 }
 
 declare module 'libsodium-wrappers-sumo' {

@@ -8,9 +8,11 @@ import {
     disconnectWallet,
     getConnectedAddress,
     isWalletConnected,
-    isLeapInstalled,
+    getAvailableWallets,
+    getActiveWalletType,
     formatAddress,
     initializeWalletState,
+    type WalletType,
 } from './wallet';
 import {
     initializeCascadeClient,
@@ -75,13 +77,11 @@ export function initUI(): void {
     // Publish tab
     document.getElementById('upload-form')?.addEventListener('submit', handleUpload);
 
-    // Check Leap availability
-    if (!isLeapInstalled()) {
-        showStatus('Leap wallet not detected. Please install Leap extension.', 'error');
-        walletButton.textContent = 'Install Leap';
-        walletButton.addEventListener('click', () => {
-            window.open('https://www.leapwallet.io/', '_blank');
-        });
+    // Check wallet availability
+    const availableWallets = getAvailableWallets();
+    if (availableWallets.length === 0) {
+        showStatus('No wallet detected. Please install Keplr or Leap extension.', 'error');
+        walletButton.textContent = 'Install Wallet';
     }
 
     // Restore wallet state from session storage
@@ -144,29 +144,111 @@ async function handleWalletClick(): Promise<void> {
         closeEditor();
         updateUI();
         showStatus('Wallet disconnected', 'info');
-    } else {
-        walletButton.disabled = true;
-        walletButton.textContent = 'Connecting...';
-
-        try {
-            await connectWallet();
-            await initializeCascadeClient();
-            await initDrafts();
-            updateUI();
-
-            // Check for pending share link
-            await processPendingShareLink();
-
-            showStatus('Wallet connected! Ready to create encrypted drafts.', 'success');
-        } catch (error) {
-            console.error('Connection error:', error);
-            showStatus(
-                error instanceof Error ? error.message : 'Failed to connect wallet',
-                'error'
-            );
-            updateUI();
-        }
+        return;
     }
+
+    const available = getAvailableWallets();
+    if (available.length === 0) {
+        showStatus('No wallet detected. Please install Keplr or Leap extension.', 'error');
+        return;
+    }
+
+    // If only one wallet available, connect directly
+    // If both are available, show a picker
+    let selectedWallet: WalletType;
+    if (available.length === 1) {
+        selectedWallet = available[0];
+    } else {
+        const chosen = await showWalletPicker(available);
+        if (!chosen) return; // User cancelled
+        selectedWallet = chosen;
+    }
+
+    walletButton.disabled = true;
+    walletButton.textContent = 'Connecting...';
+
+    try {
+        await connectWallet(selectedWallet);
+        await initializeCascadeClient();
+        await initDrafts();
+        updateUI();
+
+        // Check for pending share link
+        await processPendingShareLink();
+
+        const walletName = selectedWallet === 'keplr' ? 'Keplr' : 'Leap';
+        showStatus(`Connected via ${walletName}! Ready to create encrypted drafts.`, 'success');
+    } catch (error) {
+        console.error('Connection error:', error);
+        showStatus(
+            error instanceof Error ? error.message : 'Failed to connect wallet',
+            'error'
+        );
+        updateUI();
+    }
+}
+
+/**
+ * Show a wallet picker dialog and return the user's choice
+ */
+function showWalletPicker(available: WalletType[]): Promise<WalletType | null> {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000;';
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background:#0a0a0a;border:1px solid rgba(255,255,255,0.1);padding:1.5rem;min-width:280px;text-align:center;';
+
+        const title = document.createElement('h3');
+        title.textContent = 'CONNECT WALLET';
+        title.style.cssText = 'margin:0 0 1.5rem;color:#fff;font-size:0.75rem;font-weight:500;letter-spacing:0.1em;';
+        dialog.appendChild(title);
+
+        const walletIcons: Record<WalletType, string> = {
+            keplr: '<svg width="20" height="20" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 64C0 41.6 0 30.4 4.36 21.84C8.19 14.31 14.31 8.19 21.84 4.36C30.4 0 41.6 0 64 0C86.4 0 97.6 0 106.16 4.36C113.69 8.19 119.81 14.31 123.64 21.84C128 30.4 128 41.6 128 64C128 86.4 128 97.6 123.64 106.16C119.81 113.69 113.69 119.81 106.16 123.64C97.6 128 86.4 128 64 128C41.6 128 30.4 128 21.84 123.64C14.31 119.81 8.19 113.69 4.36 106.16C0 97.6 0 86.4 0 64Z" fill="#14AFEB"/><path d="M66.67 41.34C67.39 48.77 67.76 52.48 69.7 55.2C70.54 56.37 71.56 57.38 72.74 58.2C75.49 60.11 79.21 60.42 86.64 61.05L89.78 61.31V66.69L86.64 66.95C79.21 67.58 75.49 67.89 72.74 69.8C71.56 70.62 70.54 71.63 69.7 72.8C67.76 75.52 67.39 79.23 66.67 86.66H61.33C60.61 79.23 60.24 75.52 58.3 72.8C57.46 71.63 56.44 70.62 55.26 69.8C52.51 67.89 48.79 67.58 41.36 66.95L38.22 66.69V61.31L41.36 61.05C48.79 60.42 52.51 60.11 55.26 58.2C56.44 57.38 57.46 56.37 58.3 55.2C60.24 52.48 60.61 48.77 61.33 41.34H66.67Z" fill="white"/><path fill-rule="evenodd" clip-rule="evenodd" d="M64 14C105.18 14 114 22.83 114 64C114 105.18 105.18 114 64 114C22.83 114 14 105.18 14 64C14 22.83 22.83 14 64 14ZM96.68 31.28C84.57 19.17 60.11 23.99 42.05 42.05C23.99 60.11 19.17 84.57 31.28 96.68C43.39 108.79 67.85 103.97 85.91 85.91C103.97 67.85 108.79 43.39 96.68 31.28Z" fill="white"/></svg>',
+            leap: '<svg width="20" height="20" viewBox="0 0 805 805" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#lc0)"><g clip-path="url(#lc1)"><path d="M712.31 373.58C712.31 487.04 577.36 533.15 409.79 533.15C242.23 533.15 105.31 487.04 105.31 373.58C105.31 260.11 241.24 168.3 408.81 168.3C576.37 168.3 712.31 260.31 712.31 373.58Z" fill="#4BAF74"/><path d="M681.51 126.54C681.51 66.8 633.98 18.29 575.44 18.29C542.43 18.29 512.97 33.73 493.52 57.78C467 51.77 438.71 48.36 409.44 48.36C380.17 48.36 351.89 51.57 325.37 57.78C305.72 33.73 276.26 18.29 243.45 18.29C184.91 18.29 137.37 66.8 137.37 126.54C137.37 146.19 142.48 164.43 151.32 180.27C142.87 198.71 138.35 218.36 138.35 238.81C138.35 344.05 259.75 429.25 409.44 429.25C559.13 429.25 680.53 344.05 680.53 238.81C680.53 218.36 676.01 198.71 667.57 180.27C676.41 164.43 681.51 146.19 681.51 126.54Z" fill="#32DA6D"/><path d="M234.9 186.77C270.7 186.77 299.73 157.15 299.73 120.61C299.73 84.08 270.7 54.46 234.9 54.46C199.1 54.46 170.07 84.08 170.07 120.61C170.07 157.15 199.1 186.77 234.9 186.77Z" fill="white"/><path d="M580.8 186.77C616.6 186.77 645.62 157.15 645.62 120.61C645.62 84.08 616.6 54.46 580.8 54.46C545 54.46 515.97 84.08 515.97 120.61C515.97 157.15 545 186.77 580.8 186.77Z" fill="white"/><path d="M200.29 525.35C214.24 525.35 225.24 512.92 223.66 498.89C217.97 449.17 193.81 341.52 87.53 276.77C-53.91 190.57 58.06 487.26 58.06 487.26L28.79 504.5C18.97 510.32 23.1 525.35 34.29 525.35H200.29Z" fill="#32DA6D"/><path d="M622.34 525.35C609.77 525.35 599.95 512.92 601.32 498.89C606.24 449.37 628.24 341.52 724.1 276.77C851.98 190.57 750.82 487.26 750.82 487.26L777.34 504.5C786.18 510.32 782.44 525.35 772.42 525.35H622.34Z" fill="#32DA6D"/><path d="M235.02 132.29C241.53 132.29 246.8 126.9 246.8 120.26C246.8 113.62 241.53 108.23 235.02 108.23C228.51 108.23 223.23 113.62 223.23 120.26C223.23 126.9 228.51 132.29 235.02 132.29Z" fill="#0D0D0D"/><path d="M580.59 132.29C587.1 132.29 592.38 126.9 592.38 120.26C592.38 113.62 587.1 108.23 580.59 108.23C574.08 108.23 568.8 113.62 568.8 120.26C568.8 126.9 574.08 132.29 580.59 132.29Z" fill="#0D0D0D"/></g><rect y="586" width="805" height="310" fill="#AC4BFF"/></g><defs><clipPath id="lc0"><rect width="805" height="805" rx="144.9" fill="white"/></clipPath><clipPath id="lc1"><rect width="772.8" height="515.2" fill="white" transform="translate(16 18)"/></clipPath></defs></svg>',
+        };
+
+        for (const wallet of available) {
+            const btn = document.createElement('button');
+            btn.innerHTML = walletIcons[wallet] + '<span>' + (wallet === 'keplr' ? 'KEPLR' : 'LEAP') + '</span>';
+            btn.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:0.75rem;width:100%;padding:0.875rem 1.5rem;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#fff;cursor:pointer;font-size:0.875rem;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;transition:all 0.3s ease;';
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(255,255,255,0.1)';
+                btn.style.borderColor = 'rgba(255,255,255,0.4)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'transparent';
+                btn.style.borderColor = 'rgba(255,255,255,0.1)';
+            });
+            btn.addEventListener('click', () => {
+                document.body.removeChild(overlay);
+                resolve(wallet);
+            });
+            dialog.appendChild(btn);
+        }
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'CANCEL';
+        cancelBtn.style.cssText = 'display:block;width:100%;padding:0.75rem;margin:1rem 0 0;border:none;background:transparent;color:rgba(255,255,255,0.4);cursor:pointer;font-size:0.75rem;letter-spacing:0.05em;text-transform:uppercase;transition:color 0.3s ease;';
+        cancelBtn.addEventListener('mouseenter', () => { cancelBtn.style.color = '#fff'; });
+        cancelBtn.addEventListener('mouseleave', () => { cancelBtn.style.color = 'rgba(255,255,255,0.4)'; });
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(overlay);
+            resolve(null);
+        });
+        dialog.appendChild(cancelBtn);
+
+        overlay.appendChild(dialog);
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                document.body.removeChild(overlay);
+                resolve(null);
+            }
+        });
+
+        document.body.appendChild(overlay);
+    });
 }
 
 /**
@@ -1038,7 +1120,9 @@ function updateUI(): void {
     if (connected && address) {
         walletButton.textContent = 'Disconnect';
         walletButton.classList.add('connected');
-        walletStatus.textContent = formatAddress(address);
+        const walletType = getActiveWalletType();
+        const walletLabel = walletType === 'keplr' ? 'Keplr' : walletType === 'leap' ? 'Leap' : '';
+        walletStatus.textContent = `${walletLabel}: ${formatAddress(address)}`;
         walletStatus.classList.remove('hidden');
         tabNav.classList.remove('disabled');
 
