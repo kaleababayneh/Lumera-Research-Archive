@@ -1,3 +1,19 @@
+interface LeapWallet {
+    enable(chainId: string): Promise<void>;
+    experimentalSuggestChain(chainInfo: any): Promise<void>;
+    getKey(chainId: string): Promise<{ bech32Address: string }>;
+    getOfflineSigner(chainId: string): any;
+    getOfflineSignerAuto(chainId: string): Promise<any>;
+    signArbitrary(chainId: string, signer: string, data: string | Uint8Array): Promise<{
+        signature: string;
+        pub_key: { type: string; value: string };
+    }>;
+}
+
+interface Window {
+    leap?: LeapWallet;
+}
+
 declare module 'libsodium-wrappers-sumo' {
     export interface Sodium {
         ready: Promise<void>;

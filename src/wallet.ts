@@ -1,6 +1,6 @@
 /**
  * Wallet Module
- * Handles Keplr wallet connection and state management
+ * Handles Leap wallet connection and state management
  */
 
 import { CHAIN_ID, LUMERA_CHAIN_INFO } from './config';
@@ -26,38 +26,42 @@ export function initializeWalletState(): void {
 }
 
 /**
- * Check if Keplr wallet extension is installed
+ * Check if Leap wallet extension is installed
  */
-export function isKeplrInstalled(): boolean {
-    return typeof window.keplr !== 'undefined';
+export function isLeapInstalled(): boolean {
+    return typeof window.leap !== 'undefined';
 }
 
 /**
- * Connect to Keplr wallet
+ * @deprecated Use isLeapInstalled instead
+ */
+export const isKeplrInstalled = isLeapInstalled;
+
+/**
+ * Connect to Leap wallet
  * Suggests the Lumera chain if not already added and enables it
  * @returns The connected wallet address
- * @throws Error if Keplr is not installed or user rejects connection
+ * @throws Error if Leap is not installed or user rejects connection
  */
 export async function connectWallet(): Promise<string> {
-    if (!isKeplrInstalled()) {
+    if (!isLeapInstalled()) {
         throw new Error(
-            'Keplr wallet is not installed. Please install Keplr extension from https://www.keplr.app/'
+            'Leap wallet is not installed. Please install Leap extension from https://www.leapwallet.io/'
         );
     }
 
-    const keplr = window.keplr!;
+    const leap = window.leap!;
 
     try {
-        // // Suggest the Lumera testnet chain to Keplr
-        // // Using type assertion for experimentalSuggestChain which may not be in all type definitions
-        await (keplr as unknown as { experimentalSuggestChain: (info: typeof LUMERA_CHAIN_INFO) => Promise<void> })
+        // Suggest the Lumera testnet chain to Leap
+        await (leap as unknown as { experimentalSuggestChain: (info: typeof LUMERA_CHAIN_INFO) => Promise<void> })
              .experimentalSuggestChain(LUMERA_CHAIN_INFO);
 
         // Enable the chain (prompts user for permission)
-        await keplr.enable(CHAIN_ID);
+        await leap.enable(CHAIN_ID);
 
         // Get the user's account using getKey
-        const key = await (keplr as unknown as { getKey: (chainId: string) => Promise<{ bech32Address: string }> })
+        const key = await (leap as unknown as { getKey: (chainId: string) => Promise<{ bech32Address: string }> })
             .getKey(CHAIN_ID);
         connectedAddress = key.bech32Address;
         isConnected = true;
@@ -72,7 +76,7 @@ export async function connectWallet(): Promise<string> {
         throw new Error(
             error instanceof Error
                 ? error.message
-                : 'Failed to connect to Keplr wallet'
+                : 'Failed to connect to Leap wallet'
         );
     }
 }
@@ -117,18 +121,18 @@ export function formatAddress(address: string): string {
  * Used for deriving encryption keys deterministically
  */
 export async function signMessage(message: string): Promise<Uint8Array> {
-    if (!isKeplrInstalled()) {
-        throw new Error('Keplr not installed');
+    if (!isLeapInstalled()) {
+        throw new Error('Leap not installed');
     }
 
     if (!connectedAddress) {
         throw new Error('Wallet not connected');
     }
 
-    const keplr = window.keplr!;
+    const leap = window.leap!;
 
     // Use signArbitrary for ADR-036 signing
-    const signResult = await (keplr as unknown as {
+    const signResult = await (leap as unknown as {
         signArbitrary: (
             chainId: string,
             signer: string,

@@ -8,7 +8,7 @@ import {
     disconnectWallet,
     getConnectedAddress,
     isWalletConnected,
-    isKeplrInstalled,
+    isLeapInstalled,
     formatAddress,
     initializeWalletState,
 } from './wallet';
@@ -75,12 +75,12 @@ export function initUI(): void {
     // Publish tab
     document.getElementById('upload-form')?.addEventListener('submit', handleUpload);
 
-    // Check Keplr availability
-    if (!isKeplrInstalled()) {
-        showStatus('Keplr wallet not detected. Please install Keplr extension.', 'error');
-        walletButton.textContent = 'Install Keplr';
+    // Check Leap availability
+    if (!isLeapInstalled()) {
+        showStatus('Leap wallet not detected. Please install Leap extension.', 'error');
+        walletButton.textContent = 'Install Leap';
         walletButton.addEventListener('click', () => {
-            window.open('https://www.keplr.app/', '_blank');
+            window.open('https://www.leapwallet.io/', '_blank');
         });
     }
 

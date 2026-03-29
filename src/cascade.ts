@@ -7,7 +7,6 @@
 import {
     createLumeraClient,
     type LumeraClient,
-    getKeplrSigner,
 } from '@lumera-protocol/sdk-js';
 import { getConnectedAddress, isWalletConnected } from './wallet';
 import { GAS_PRICE, CHAIN_ID, LUMESCOPE_API_BASE } from './config';
@@ -29,6 +28,35 @@ let lumeraClient: LumeraClient | null = null;
 const PAPERS_STORAGE_KEY = 'lumera_research_archive_papers_fallback';
 
 /**
+ * Get a signer from Leap wallet for the specified chain.
+ * Mirrors the SDK's getLeapSigner but avoids deep import restrictions.
+ */
+async function getLeapSigner(chainId: string) {
+    if (typeof window === 'undefined' || !window.leap) {
+        throw new Error('Leap extension not found. Please install Leap from https://www.leapwallet.io/');
+    }
+
+    const leap = window.leap;
+    await leap.enable(chainId);
+    const offlineSigner = await leap.getOfflineSignerAuto(chainId);
+
+    return {
+        ...offlineSigner,
+        getAccounts: () => offlineSigner.getAccounts(),
+        signAmino: offlineSigner.signAmino?.bind(offlineSigner),
+        signDirect: offlineSigner.signDirect?.bind(offlineSigner),
+        async signArbitrary(_chainId: string, signerAddress: string, data: string | Uint8Array) {
+            const result = await leap.signArbitrary(_chainId, signerAddress, data);
+            return {
+                signed: data,
+                signature: result.signature,
+                pub_key: result.pub_key,
+            };
+        },
+    };
+}
+
+/**
  * Initialize the Lumera client with the connected wallet
  * Must be called after wallet connection
  */
@@ -44,9 +72,9 @@ export async function initializeCascadeClient(): Promise<void> {
     }
 
     try {
-        // Use the SDK's getKeplrSigner which returns a UniversalSigner
+        // Use the SDK's getLeapSigner which returns a UniversalSigner
         // that properly supports signArbitrary for ADR-036 signing
-        const signer = await getKeplrSigner(CHAIN_ID);
+        const signer = await getLeapSigner(CHAIN_ID);
 
         // Create the Lumera client using the testnet preset
         lumeraClient = await createLumeraClient({

@@ -1,6 +1,6 @@
 /**
  * Lumera Testnet Chain Configuration
- * Used for Keplr wallet integration
+ * Used for Leap wallet integration
  */
 
 // Lumera Testnet Configuration
@@ -23,8 +23,8 @@ export const GAS_PRICE = '0.025ulume';
 // Using HTTPS for the publicly accessible Lumescope instance
 export const LUMESCOPE_API_BASE = import.meta.env.VITE_LUMESCOPE_API_BASE
 /**
- * Keplr chain info for Lumera Testnet
- * This is used to suggest the chain to the Keplr wallet
+ * Chain info for Lumera Testnet
+ * This is used to suggest the chain to the Leap wallet
  */
 export const LUMERA_CHAIN_INFO = {
     chainId: CHAIN_ID,
